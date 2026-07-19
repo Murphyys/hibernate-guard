@@ -1,0 +1,6 @@
+{
+  "idleMinutes": 30,
+  "countdownSeconds": 90,
+  "staleFlagHours": 6,
+  "dryRun": true
+}
