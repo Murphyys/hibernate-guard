@@ -51,20 +51,24 @@ function Get-IdleSeconds {
     return [int]([HgIdle]::GetIdleMilliseconds() / 1000)
 }
 
-# $true = at least one live (non-stale) busy flag; stale flags are deleted on sight
-function Test-Busy {
-    if (-not (Test-Path $busyDir)) { return $false }
+# Runs every pass regardless of idle state, so orphaned flags (crashed/killed
+# sessions that never fired Stop) don't sit around simply because the machine
+# stayed active and Test-Busy was never reached.
+function Remove-StaleFlags {
+    if (-not (Test-Path $busyDir)) { return }
     $staleBefore = (Get-Date).AddHours(-[double]$config.staleFlagHours)
-    $busy = $false
     foreach ($f in Get-ChildItem $busyDir -Filter '*.flag' -ErrorAction SilentlyContinue) {
         if ($f.LastWriteTime -lt $staleBefore) {
             Write-Log "stale busy flag removed: $($f.Name) (last write $($f.LastWriteTime))"
             Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
-        } else {
-            $busy = $true
         }
     }
-    return $busy
+}
+
+# $true = at least one (already-pruned) busy flag remains
+function Test-Busy {
+    if (-not (Test-Path $busyDir)) { return $false }
+    return @(Get-ChildItem $busyDir -Filter '*.flag' -ErrorAction SilentlyContinue).Count -gt 0
 }
 
 # Popup with countdown + Cancel. Returns $true to proceed with hibernate.
@@ -135,6 +139,8 @@ function Show-CountdownPopup([int]$Seconds) {
 # ---- main: one check pass ------------------------------------------------------
 
 if (Test-Path $pausedFlag) { exit 0 }
+
+Remove-StaleFlags
 
 $idleThreshold = [int]$config.idleMinutes * 60
 $idle = Get-IdleSeconds

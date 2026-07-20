@@ -12,6 +12,8 @@
 
 ## Pending / Known issues
 
-- **dryRun ยังเปิดอยู่** — รอ Ice ทดสอบ 1 คืนแล้วค่อยตั้ง `dryRun: false` ใน `%LOCALAPPDATA%\HibernateGuard\config.json`
+- **dryRun ยังเปิดอยู่** — รอ Ice ทดสอบอีกคืนแล้วค่อยตั้ง `dryRun: false` ใน `%LOCALAPPDATA%\HibernateGuard\config.json`
 - Hooks มีผลเฉพาะ Claude Code session ที่เปิดใหม่หลังติดตั้ง — session ที่เปิดค้างก่อนติดตั้งจะไม่สร้าง busy flag
 - Background task (`run_in_background`) ไม่ถูกนับเป็น busy — by design (ยอมรับแล้ว)
+- **2026-07-20 แก้บั๊ก:** stale-flag cleanup เดิมอยู่ใน `Test-Busy` ซึ่งถูกเรียกก็ต่อเมื่อ idle ผ่าน 30 นาทีแล้ว — ถ้าเครื่อง active ทั้งวัน flag จาก session ที่ crash/ปิดกลางคันจะไม่เคยถูกกวาดเลย แก้โดยแยก `Remove-StaleFlags` ออกมารันทุก pass ไม่ต้องรอ idle (ดู `watcher.ps1`)
+- **สังเกตจริง:** เครื่อง Ice มี `claude.exe` process รันพร้อมกันได้เยอะมาก (~14 ตัวตอนตรวจ) จาก MCP/scheduled task ต่างๆ (เช่น todo→Obsidian sync) — busy-check จะบล็อก hibernate ตราบใดที่ session ไหนก็ตามยังไม่ยิง `Stop` ซึ่งถูกต้องตาม design แต่ทำให้ hibernate ไม่เกิดขึ้นบ่อยกว่าที่คาดถ้ามี background job ทำงานยาวๆ ระหว่างคืน
