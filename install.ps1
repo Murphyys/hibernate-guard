@@ -25,8 +25,8 @@ Write-Host '  Done.' -ForegroundColor Green
 
 # -- 2. Scheduled task (every minute, hidden, current user) ----------------------
 Write-Host "Registering scheduled task '$taskName' ..."
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$installDir\watcher.ps1`"" `
+$action = New-ScheduledTaskAction -Execute 'conhost.exe' `
+    -Argument "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$installDir\watcher.ps1`"" `
     -WorkingDirectory $installDir
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
     -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Days 3650)
