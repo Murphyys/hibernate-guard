@@ -109,7 +109,45 @@ if ($hib -eq 1) {
     Write-Host '  WARNING: Hibernate appears DISABLED. Run as admin:  powercfg /hibernate on' -ForegroundColor Yellow
 }
 
-# -- 6. Summary ------------------------------------------------------------------
+# -- 6. Post-install self-check --------------------------------------------------
+# Catches the 2026-07-20..29 failure mode: when install.ps1 runs inside an AI
+# agent's sandboxed shell, the file copies land in a filesystem overlay while
+# Register-ScheduledTask hits the real service - producing a task that points at
+# files Task Scheduler cannot see, with no error anywhere. The only trustworthy
+# witness is a task-context process, so ask one.
+Write-Host 'Verifying the scheduled task can actually see the installed files ...'
+$probeName = 'HibernateGuard-SelfCheck'
+$probeOut  = Join-Path $env:TEMP 'hibernateguard-selfcheck.txt'
+try {
+    if (Test-Path $probeOut) { Remove-Item $probeOut -Force }
+    $probeCmd = "Set-Content -Path '$probeOut' -Value (Test-Path '$installDir\watcher.ps1')"
+    $probeAction = New-ScheduledTaskAction -Execute "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" `
+        -Argument "-NoProfile -ExecutionPolicy Bypass -Command `"$probeCmd`""
+    Register-ScheduledTask -TaskName $probeName -Action $probeAction -Force | Out-Null
+    Start-ScheduledTask -TaskName $probeName
+    $waited = 0
+    while ((Get-ScheduledTask -TaskName $probeName).State -ne 'Ready' -and $waited -lt 20) {
+        Start-Sleep -Milliseconds 500
+        $waited++
+    }
+    Start-Sleep -Milliseconds 500
+    $seen = $false
+    if (Test-Path $probeOut) { $seen = ((Get-Content $probeOut -Raw).Trim() -eq 'True') }
+    if ($seen) {
+        Write-Host '  PASS - files are on the real disk.' -ForegroundColor Green
+    } else {
+        Write-Host '  FAIL - Task Scheduler cannot see watcher.ps1!' -ForegroundColor Red
+        Write-Host '  You are almost certainly installing from a sandboxed shell (AI agent tool).' -ForegroundColor Red
+        Write-Host '  Re-run install.ps1 from a real PowerShell window.' -ForegroundColor Red
+    }
+} catch {
+    Write-Host "  Self-check could not run: $_" -ForegroundColor Yellow
+} finally {
+    Unregister-ScheduledTask -TaskName $probeName -Confirm:$false -ErrorAction SilentlyContinue
+    if (Test-Path $probeOut) { Remove-Item $probeOut -Force -ErrorAction SilentlyContinue }
+}
+
+# -- 7. Summary ------------------------------------------------------------------
 $cfg = Get-Content "$installDir\config.json" -Raw | ConvertFrom-Json
 Write-Host ''
 Write-Host '================================================' -ForegroundColor Cyan
