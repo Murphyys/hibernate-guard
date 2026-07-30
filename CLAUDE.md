@@ -26,9 +26,20 @@ Get-Content "$env:LOCALAPPDATA\HibernateGuard\watcher.log" -Tail 5   # ต้อ
 
 `install.ps1` มี **post-install self-check** (step 6) ที่ยิง task ชั่วคราวไปตรวจว่า Task Scheduler มองเห็น `watcher.ps1` จริงไหม — ถ้าขึ้น FAIL แปลว่ากำลังติดตั้งจาก sandbox ให้ไปรันจาก PowerShell จริง
 
+### ถ้าแก้สคริปต์จากใน Claude Code — ต้อง deploy **สองฝั่ง** ⚠️
+
+runtime มี 2 มุมมองที่ไม่ตรงกัน และคนละตัวอ่านคนละฝั่ง:
+
+| ใครรัน | อ่านจาก | deploy ยังไง |
+|---|---|---|
+| `watcher.ps1` (Task Scheduler) | **ดิสก์จริง** | ให้ scheduled task copy repo → runtime |
+| `hibernate-hook.ps1` (hooks ของ Claude Code) | **sandbox overlay** | copy ด้วย shell tool ปกติ |
+
+เจอตอน 2026-07-30: deploy hook ตัวใหม่ลงดิสก์จริงแล้วแต่ hook ยังเขียน path เดิม เพราะ overlay บังสคริปต์เก่า (1164 bytes ลงวันที่ 20 ก.ค.) ไว้อยู่ — **แก้ฝั่งเดียวไม่พอ ต้องทับทั้งสองฝั่งเสมอ** ไม่งั้นสองตัวนี้จะคนละเวอร์ชันเงียบๆ
+
 ## Pending / Known issues
 
-- **⏳ รอ Ice arm เอง — ตอนนี้ `dryRun = true` (2026-07-29)** — ติดตั้งลงดิสก์จริงรอบแรกสำเร็จแล้ว แต่ยังไม่เคยผ่านการทดสอบจริงสักครั้ง (ดู root cause ด้านล่าง) จึงตั้ง dry-run ไว้ก่อน ให้ดู `watcher.log` ว่ามี pass เดินจริงตามเวลา + ข้อความ `DRY-RUN: would hibernate now` ขึ้นตอน idle ครบ แล้วค่อยแก้ `dryRun` เป็น `false` ใน `%LOCALAPPDATA%\HibernateGuard\config.json` (แก้ runtime พอ ไม่ต้อง re-install); pause ใช้ `toggle.ps1` หรือสร้าง `paused.flag`
+- **✅ ARMED แล้ว (2026-07-30) — `dryRun = false` บนดิสก์จริง** ผ่าน gate ครบทั้ง 2 ด่านก่อน arm: (1) watcher เดินตาม trigger จริงทุก 1 นาที (2) busy flag ของ session โผล่ที่ `%TEMP%\HibernateGuard-busy` และ **scheduled task อ่านเห็น** = busy-check ทำงานจริงไม่ใช่แค่ใน overlay. pause ใช้ desktop shortcut "Hibernate Guard Toggle" หรือสร้าง `paused.flag` ใน install dir
 - **✅ 2026-07-30 busy flag ย้ายไป `%TEMP%\HibernateGuard-busy` (แก้แล้ว):** ทดสอบแล้วพบว่า hooks ของ Claude Code เขียน flag ลง **sandbox overlay** เหมือน installer เดิม — hook สร้าง `9561f7a5….flag` ตรงเวลาที่ยิง prompt จริง แต่ scheduled task บนเครื่องจริงเห็น busy dir **ว่างเปล่า** = busy-check ตายสนิท. แก้โดยย้าย busy dir ออกจาก `%LOCALAPPDATA%` (ถูก virtualize) ไป `%TEMP%` (ไม่ถูก virtualize — ยืนยันแล้วว่า `$env:TEMP` ของ task กับของ agent ตรงกันคือ `C:\Users\icebo\AppData\Local\Temp`). **`hibernate-hook.ps1` กับ `watcher.ps1` ต้องชี้ path เดียวกันเสมอ** — แก้ที่เดียวไม่พอ
 - **อาการที่ดูเหมือนบั๊กแต่ไม่ใช่ — popup นับ 90 วิ ครบแล้วไม่ดับ แล้วนับใหม่:** นั่นคือ dry-run ทำงานถูกต้อง (`watcher.ps1` เจอ `dryRun:true` → log แล้ว `exit 0` ไม่ยิง `shutdown /h`) แล้ว task ยิงใหม่นาทีถัดไป เงื่อนไขยังครบ → popup ใหม่. ถ้าเห็นอาการนี้ให้เช็ค `dryRun` ใน config ก่อนจะไปไล่ debug อย่างอื่น
 - Hooks มีผลเฉพาะ Claude Code session ที่เปิดใหม่หลังติดตั้ง — session ที่เปิดค้างก่อนติดตั้งจะไม่สร้าง busy flag
