@@ -12,17 +12,26 @@ Hibernate เครื่อง Windows อัตโนมัติเมื่�
 ## วิธีทำงาน
 
 ```
-Claude Code hooks                          Task Scheduler (ทุก 1 นาที)
-  UserPromptSubmit → สร้าง busy/<sid>.flag    watcher.ps1:
-  Stop/SessionEnd  → ลบ flag                   paused? → ข้าม
-                                               busy/ มี flag สด? → ข้าม
-                                               idle < 30 นาที? → ข้าม
-                                               → popup countdown 90 วิ
-                                               → เช็คซ้ำ → shutdown /h
+Claude Code hooks                                Task Scheduler (ทุก 1 นาที)
+  UserPromptSubmit → สร้าง <busy>/<sid>.flag       watcher.ps1:
+  Stop/SessionEnd  → ลบ flag                         paused? → ข้าม
+                                                     มี flag สด? → ข้าม
+                                                     idle < 30 นาที? → ข้าม
+                                                     → popup countdown 90 วิ
+                                                     → เช็คซ้ำ → shutdown /h
 ```
 
 - Flag ที่ค้างเกิน 6 ชม. (session crash โดยไม่ยิง Stop) ถือว่า stale — ลบทิ้งอัตโนมัติ
-- ทุกอย่างติดตั้งที่ `%LOCALAPPDATA%\HibernateGuard` (log อยู่ที่นั่นด้วย: `watcher.log`)
+- สคริปต์ + log ติดตั้งที่ `%LOCALAPPDATA%\HibernateGuard` (`watcher.log`)
+- **busy flag อยู่ที่ `%TEMP%\HibernateGuard-busy`** ไม่ใช่ในโฟลเดอร์ติดตั้ง — ดูเหตุผลด้านล่าง
+
+### Why busy flags live in `%TEMP%`
+
+shell tool ของ AI agent (Claude Code) รันใน sandbox ที่ **virtualize การเขียนลง `%LOCALAPPDATA%\HibernateGuard`** — ไฟล์ที่เขียนจะไปอยู่ใน overlay ที่มองเห็นได้เฉพาะใน agent เท่านั้น ไม่ลงดิสก์จริง
+
+hooks ของ Claude Code ก็รันใน sandbox เดียวกัน ตอนทดสอบ 2026-07-30 พบว่า hook สร้าง flag จริง (`9561f7a5….flag` เขียนตรงเวลาที่ยิง prompt) แต่ scheduled task ที่รันบนเครื่องจริงเห็น busy dir **ว่างเปล่า** → busy-check ตายสนิท ถ้า arm ไว้ในสภาพนั้นเครื่องจะ hibernate ทับตอน Claude กำลังรันงานยาว
+
+`%TEMP%` ไม่ถูก virtualize (พิสูจน์แล้วว่าไฟล์ที่ agent เขียนลง `%TEMP%` scheduled task อ่านและรันได้จริง) จึงย้าย busy dir มาที่นี่ — ทั้ง hook และ watcher ต้องชี้ path เดียวกันเสมอ (`hibernate-hook.ps1` กับ `watcher.ps1`)
 
 ## ติดตั้ง
 

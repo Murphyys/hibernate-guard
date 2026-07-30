@@ -13,7 +13,9 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $baseDir    = $PSScriptRoot
-$busyDir    = Join-Path $baseDir 'busy'
+# Deliberately outside $baseDir - must match hibernate-hook.ps1.
+# See README "Why busy flags live in %TEMP%".
+$busyDir    = Join-Path $env:TEMP 'HibernateGuard-busy'
 $pausedFlag = Join-Path $baseDir 'paused.flag'
 $logFile    = Join-Path $baseDir 'watcher.log'
 $config     = Get-Content (Join-Path $baseDir 'config.json') -Raw | ConvertFrom-Json

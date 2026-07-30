@@ -13,7 +13,8 @@ Write-Host '========================' -ForegroundColor Cyan
 # -- 1. Copy files ---------------------------------------------------------------
 Write-Host "Copying files to $installDir ..."
 if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir | Out-Null }
-if (-not (Test-Path "$installDir\busy")) { New-Item -ItemType Directory -Path "$installDir\busy" | Out-Null }
+$busyDir = Join-Path $env:TEMP 'HibernateGuard-busy'   # see README "Why busy flags live in %TEMP%"
+if (-not (Test-Path $busyDir)) { New-Item -ItemType Directory -Path $busyDir | Out-Null }
 foreach ($f in 'watcher.ps1', 'hibernate-hook.ps1', 'toggle.ps1') {
     Copy-Item "$srcDir\$f" "$installDir\$f" -Force
 }

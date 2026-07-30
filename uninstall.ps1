@@ -45,5 +45,9 @@ if (Test-Path $lnk) { Remove-Item $lnk -Force }
 Write-Host 'Removing install directory ...'
 if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
 
+Write-Host 'Removing busy-flag directory ...'
+$busyDir = Join-Path $env:TEMP 'HibernateGuard-busy'
+if (Test-Path $busyDir) { Remove-Item $busyDir -Recurse -Force }
+
 Write-Host ''
 Write-Host 'HibernateGuard uninstalled.' -ForegroundColor Green

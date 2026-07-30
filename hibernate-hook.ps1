@@ -19,7 +19,10 @@ try {
     $sid = $sid -replace '[^\w\-]', ''
     if (-not $sid) { exit 0 }
 
-    $busyDir = Join-Path $env:LOCALAPPDATA 'HibernateGuard\busy'
+    # NOT under the install dir on purpose - see README "Why busy flags live in %TEMP%".
+    # An AI agent's sandboxed shell virtualizes writes to %LOCALAPPDATA%\HibernateGuard,
+    # so flags written there are invisible to the watcher running on the real machine.
+    $busyDir = Join-Path $env:TEMP 'HibernateGuard-busy'
     $flag = Join-Path $busyDir "$sid.flag"
     if ($Action -eq 'busy') {
         if (-not (Test-Path $busyDir)) {
